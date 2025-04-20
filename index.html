@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Server Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #eee;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    header {
+      background: #222;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+    }
+
+    h1 {
+      color: #4fc3f7;
+      margin-bottom: 1em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    main {
+      padding: 1.5rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+
+    .stats p {
+      margin: 0;
+    }
+
+    canvas {
+      width: 100% !important;
+      max-height: 400px;
+      background: #222;
+      border-radius: 8px;
+      border: 1px solid #333;
+    }
+
+    select {
+      background: #333;
+      color: #eee;
+      border: 1px solid #555;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+    }
+    
+    footer {
+      margin-top: 3em;
+      text-align: center;
+      font-size: 0.9em;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📊 Server Monitor</h1>
+    <div class="controls">
+      <label for="window">Time Window:</label>
+      <select id="window">
+        <option value="5">Last 5 minutes</option>
+        <option value="30">Last 30 minutes</option>
+        <option value="60">Last 1 hour</option>
+        <option value="180">Last 3 hours</option>
+        <option value="1440">Last 24 hours</option>
+        <option value="0">All</option>
+      </select>
+    </div>
+  </header>
+
+  <main>
+    <div class="stats">
+      <p><strong>CPU:</strong> <span id="cpuValue">-</span>%</p>
+      <p><strong>RAM:</strong> <span id="ramValue">-</span>%</p>
+      <p><strong>Disk:</strong> <span id="diskValue">-</span>%</p>
+    </div>
+    <canvas id="chart"></canvas>
+  </main>
+  
+  <footer>
+    🔄 Auto-updating every 1 minute — Made by Bima 💙
+  </footer>
+
+  <script>
+    const ctx = document.getElementById('chart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'CPU (%)', data: [], borderColor: 'cyan', fill: false },
+          { label: 'RAM (%)', data: [], borderColor: 'magenta', fill: false },
+          { label: 'Disk (%)', data: [], borderColor: 'yellow', fill: false },
+        ]
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true, max: 100 },
+          x: {
+            type: 'time',
+            time: { tooltipFormat: 'HH:mm:ss' },
+            ticks: { autoSkip: true }
+          }
+        }
+      }
+    });
+
+    const windowSelect = document.getElementById('window');
+
+    async function fetchData() {
+      const res = await fetch('data.json', { cache: 'no-store' });
+      const data = await res.json();
+
+      const now = Date.now();
+      const minutes = parseInt(windowSelect.value);
+      const filtered = minutes === 0
+        ? data
+        : data.filter(d => now - d.time <= minutes * 60 * 1000);
+
+      chart.data.labels = filtered.map(d => new Date(d.time));
+      chart.data.datasets[0].data = filtered.map(d => d.cpu);
+      chart.data.datasets[1].data = filtered.map(d => d.ram);
+      chart.data.datasets[2].data = filtered.map(d => d.disk);
+      chart.update();
+
+      const latest = data[data.length - 1] || {};
+      document.getElementById('cpuValue').textContent = (latest.cpu ?? 0).toFixed(2);
+      document.getElementById('ramValue').textContent = (latest.ram ?? 0).toFixed(2);
+      document.getElementById('diskValue').textContent = (latest.disk ?? 0).toFixed(2);
+    }
+
+    windowSelect.addEventListener('change', fetchData);
+    setInterval(fetchData, 60000);
+    fetchData();
+  </script>
+</body>
+</html>
